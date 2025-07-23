@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>Welcome to Social Network</h1>
+{% if user.is_authenticated %}
+    <p>Hello, {{ user.username }}!</p>
+{% else %}
+    <p>Please register or login.</p>
+{% endif %}
+{% endblock %}
