@@ -79,3 +79,7 @@ def add_comment(request, post_id):
     else:
         form = CommentForm()
     return render(request, 'posts/add_comment.html', {'form': form})
+
+def post_detail(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    return render(request, 'posts/post_detail.html', {'post': post})
