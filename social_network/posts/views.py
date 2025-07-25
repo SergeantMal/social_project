@@ -2,7 +2,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Post
-from .forms import PostCreateForm, PostEditForm
+from .forms import PostCreateForm, PostEditForm, CommentForm
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from .models import Like, Comment
 
 def home(request):
     return render(request, 'posts/home.html')
@@ -45,3 +48,34 @@ def delete_post(request, post_id):
         post.delete()
         messages.success(request, 'Post deleted successfully!')
     return redirect('feed:home')
+
+
+@require_POST
+@login_required
+def toggle_like(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    like, created = Like.objects.get_or_create(user=request.user, post=post)
+
+    if not created:
+        like.delete()
+
+    return JsonResponse({
+        'liked': created,
+        'likes_count': post.likes_count
+    })
+
+
+@login_required
+def add_comment(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    if request.method == 'POST':
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.user = request.user
+            comment.post = post
+            comment.save()
+            return redirect('feed:home')
+    else:
+        form = CommentForm()
+    return render(request, 'posts/add_comment.html', {'form': form})
