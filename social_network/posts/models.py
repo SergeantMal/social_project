@@ -16,6 +16,9 @@ class Like(models.Model):
     class Meta:
         unique_together = ('user', 'post')  # Один пользователь - один лайк на пост
 
+    def __str__(self):
+        return f'{self.user} likes {self.post.id}'
+
 class Comment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     post = models.ForeignKey('Post', on_delete=models.CASCADE)
@@ -24,6 +27,9 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user}: {self.text[:20]}...'
 
 class Post(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')

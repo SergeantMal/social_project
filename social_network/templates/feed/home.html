@@ -28,7 +28,8 @@
                     <div class="card-body">
                         <p class="card-text">{{ post.text }}</p>
                         {% if post.image %}
-                            <img src="{{ post.image.url }}" class="img-fluid rounded mb-3">
+                            <img src="{{ post.image.url }}" class="img-fluid rounded mb-3 post-image"
+                                 loading="lazy" alt="Post image by {{ post.author.username }}">
                         {% endif %}
                     </div>
 
