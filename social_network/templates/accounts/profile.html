@@ -12,6 +12,16 @@
                 <p><strong>Username:</strong> {{ profile_user.username }}</p>
                 <p><strong>Email:</strong> {{ profile_user.email }}</p>
                 <p><strong>Bio:</strong> {{ profile_user.bio }}</p>
+                <a href="{% url 'messaging:new_conversation' profile_user.id %}"
+                   class="btn btn-primary position-relative"
+                   id="message-btn">
+                    <i class="bi bi-envelope"></i> Написать
+                    {% if unread_count %}
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                        {{ unread_count }}
+                    </span>
+                    {% endif %}
+                </a>
 
                 {% if user == profile_user %}
                     <a href="{% url 'accounts:profile_edit' %}" class="btn btn-primary">Edit Profile</a>
@@ -103,6 +113,19 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+});
+// В шаблоне профиля
+document.getElementById('message-btn').addEventListener('click', function(e) {
+    e.preventDefault();
+    fetch(`/messages/api/can-message/{{ profile_user.id }}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.can_message) {
+                window.location.href = this.href;
+            } else {
+                alert(data.message);
+            }
+        });
 });
 </script>
 {% endblock %}

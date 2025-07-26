@@ -11,9 +11,9 @@ class Conversation(models.Model):
     class Meta:
         ordering = ['-updated_at']
 
-    def get_other_user(self, current_user):
+    def get_other_participant(self, user):
         """Возвращает собеседника в диалоге"""
-        return self.participants.exclude(id=current_user.id).first()
+        return self.participants.exclude(id=user.id).first()
 
 class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
@@ -24,3 +24,11 @@ class Message(models.Model):
 
     class Meta:
         ordering = ['timestamp']
+
+    def __str__(self):
+        return f"{self.sender.username}: {self.content[:20]}..."
+
+    # Добавим свойство для удобного доступа
+    @property
+    def display_content(self):
+        return self.content

@@ -7,17 +7,17 @@
             <h2>Your Conversations</h2>
             <div class="list-group">
                 {% for conversation in conversations %}
-                    {% with other_user=conversation.get_other_user current_user %}
-                        {% if other_user %}
-                            <a href="{% url 'messaging:conversation_detail' other_user.id %}"
+                    {% for participant in conversation.participants.all %}
+                        {% if participant != request.user %}
+                            <a href="{% url 'messaging:conversation_detail' participant.id %}"
                                class="list-group-item list-group-item-action">
                                 <div class="d-flex justify-content-between">
                                     <div>
-                                        {% if other_user.profile_picture %}
-                                            <img src="{{ other_user.profile_picture.url }}"
+                                        {% if participant.profile_picture %}
+                                            <img src="{{ participant.profile_picture.url }}"
                                                  class="rounded-circle me-2" width="32" height="32">
                                         {% endif %}
-                                        <strong>{{ other_user.username }}</strong>
+                                        <strong>{{ participant.username }}</strong>
                                     </div>
                                     <small class="text-muted">{{ conversation.updated_at|timesince }} ago</small>
                                 </div>
@@ -30,7 +30,7 @@
                                 </p>
                             </a>
                         {% endif %}
-                    {% endwith %}
+                    {% endfor %}
                 {% empty %}
                     <div class="alert alert-info">No conversations yet.</div>
                 {% endfor %}

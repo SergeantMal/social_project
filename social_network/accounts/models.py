@@ -42,6 +42,10 @@ class CustomUser(AbstractUser):
         """Количество подписок"""
         return self.subscriptions.count()
 
+    def can_receive_message_from(self, user):
+        """Проверяет, может ли пользователь получить сообщение"""
+        return self != user and self.is_active
+
 
 class Subscription(models.Model):
     subscriber = models.ForeignKey(

@@ -1,7 +1,10 @@
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+
+from accounts.models import CustomUser
 from .models import Conversation, Message
 from .forms import MessageForm
 
@@ -16,12 +19,16 @@ def conversation_list(request):
 
     return render(request, 'messaging/conversation_list.html', {
         'conversations': conversations,
-        'current_user': request.user  # Передаем явно
+        'request': request  # Важно передать request
     })
 
 @login_required
 def conversation_detail(request, user_id):
-    other_user = get_object_or_404(User, id=user_id)
+    other_user = get_object_or_404(CustomUser, id=user_id)
+
+    # Проверка, что пользователь не пытается писать сам себе
+    if request.user == other_user:
+        return redirect('messaging:conversation_list')
 
     # Найдем или создадим диалог
     conversation = Conversation.objects.filter(
@@ -49,16 +56,52 @@ def conversation_detail(request, user_id):
     # Помечаем сообщения как прочитанные
     conversation.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
 
-    messages = conversation.messages.all().order_by('timestamp')
+    messages = conversation.messages.all().select_related('sender').order_by('timestamp')
 
     return render(request, 'messaging/conversation_detail.html', {
         'conversation': conversation,
         'other_user': other_user,
-        'messages': messages,
+        'chat_messages': messages,
         'form': form
     })
 
+from django.core.exceptions import PermissionDenied
+
+def check_message_permission(view_func):
+    """Декоратор для проверки прав на отправку сообщения"""
+    def wrapper(request, user_id, *args, **kwargs):
+        other_user = get_object_or_404(User, id=user_id)
+        if not other_user.can_receive_message_from(request.user):
+            raise PermissionDenied("You can't send messages to this user")
+        return view_func(request, user_id, *args, **kwargs)
+    return wrapper
 
 @login_required
+@check_message_permission
 def new_conversation(request, user_id):
-    return conversation_detail(request, user_id)
+    other_user = get_object_or_404(CustomUser, id=user_id)
+
+    if not other_user.can_receive_message_from(request.user):
+        return redirect('accounts:user_profile', username=other_user.username)
+
+    # Проверяем, есть ли уже диалог
+    conversation = Conversation.objects.filter(
+        participants=request.user
+    ).filter(
+        participants=other_user
+    ).first()
+
+    if not conversation:
+        conversation = Conversation.objects.create()
+        conversation.participants.add(request.user, other_user)
+
+    return redirect('messaging:conversation_detail', user_id=user_id)
+
+@login_required
+def can_message_user(request, user_id):
+    other_user = get_object_or_404(CustomUser, id=user_id)
+    can_message = other_user.can_receive_message_from(request.user)
+    return JsonResponse({
+        'can_message': can_message,
+        'message': "You can't message this user" if not can_message else ""
+    })

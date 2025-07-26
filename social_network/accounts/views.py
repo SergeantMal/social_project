@@ -6,6 +6,8 @@ from django.shortcuts import render, get_object_or_404
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+
+from messaging.models import Conversation
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 from .models import CustomUser
 from django.contrib import messages
@@ -17,6 +19,24 @@ from django.views.decorators.http import require_POST
 
 @login_required
 def profile_view(request, username=None):
+    profile_user = get_object_or_404(CustomUser, username=username)
+
+    # Добавьте этот код для подсчета непрочитанных сообщений
+    unread_count = 0
+    if request.user.is_authenticated and request.user != profile_user:
+        conversation = Conversation.objects.filter(
+            participants=request.user
+        ).filter(
+            participants=profile_user
+        ).first()
+
+        if conversation:
+            unread_count = conversation.messages.filter(
+                is_read=False
+            ).exclude(
+                sender=request.user
+            ).count()
+
     if username is None:
         # Если username не указан, показываем профиль текущего пользователя
         profile_user = request.user
@@ -30,7 +50,8 @@ def profile_view(request, username=None):
 
     return render(request, 'accounts/profile.html', {
         'profile_user': profile_user,
-        'is_subscribed': is_subscribed
+        'is_subscribed': is_subscribed,
+        'unread_count': unread_count,
     })
 def register_view(request):
     if request.method == 'POST':
