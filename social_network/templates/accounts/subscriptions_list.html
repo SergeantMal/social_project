@@ -1,32 +1,151 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<!-- Модальное окно подтверждения -->
+<div class="modal fade" id="unsubscribeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Подтверждение отписки</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Вы уверены, что хотите отписаться от этого пользователя?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-danger" id="confirmUnsubscribe">Отписаться</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="container">
     <div class="row">
         <div class="col-md-8 offset-md-2">
-            <h2>Subscriptions of {{ profile_user.username }}</h2>
-            <p class="text-muted">{{ subscriptions.count }} subscriptions</p>
-            
-            <div class="list-group mt-3">
+            <h2>Подписки {{ profile_user.username }}</h2>
+            <p class="text-muted"><span id="subscriptions-count">{{ subscriptions.count }}</span> подписок</p>
+
+            <div class="list-group mt-3" id="subscriptions-list">
                 {% for sub in subscriptions %}
-                <div class="list-group-item">
+                <div class="list-group-item" id="subscription-{{ sub.target_user.username }}">
                     <div class="d-flex justify-content-between align-items-center">
                         <a href="{% url 'accounts:user_profile' sub.target_user.username %}" class="text-decoration-none">
                             {{ sub.target_user.username }}
                         </a>
                         {% if user == profile_user %}
-                            <a href="{% url 'accounts:toggle_subscription' sub.target_user.username %}" 
-                               class="btn btn-sm btn-outline-danger">
-                                Unsubscribe
-                            </a>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger unsubscribe-btn"
+                                    data-username="{{ sub.target_user.username }}"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#unsubscribeModal">
+                                Отписаться
+                            </button>
                         {% endif %}
                     </div>
                 </div>
                 {% empty %}
-                <div class="alert alert-info">No subscriptions yet.</div>
+                <div class="alert alert-info">Пока еще нет подписок.</div>
                 {% endfor %}
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const unsubscribeModal = new bootstrap.Modal(document.getElementById('unsubscribeModal'));
+    let currentUsername = null;
+
+    // Обработчик для кнопок отписки
+    document.querySelectorAll('.unsubscribe-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            currentUsername = this.getAttribute('data-username');
+            unsubscribeModal.show();
+        });
+    });
+
+    // Обработчик для подтверждения отписки
+    document.getElementById('confirmUnsubscribe').addEventListener('click', function() {
+        if (currentUsername) {
+            toggleSubscription(currentUsername);
+            unsubscribeModal.hide();
+        }
+    });
+
+    // Сброс username при закрытии модального окна
+    document.getElementById('unsubscribeModal').addEventListener('hidden.bs.modal', function() {
+        currentUsername = null;
+    });
+});
+
+function toggleSubscription(username) {
+    const button = document.querySelector(`.unsubscribe-btn[data-username="${username}"]`);
+
+    fetch(`/accounts/profile/${username}/subscribe/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Удаляем элемент из списка
+            const item = document.getElementById(`subscription-${username}`);
+            if (item) item.remove();
+
+            // Обновляем счетчик
+            const countElement = document.getElementById('subscriptions-count');
+            if (countElement) {
+                const newCount = parseInt(countElement.textContent) - 1;
+                countElement.textContent = newCount > 0 ? newCount : 0;
+            }
+
+            // Если список пуст, показываем сообщение
+            if (document.querySelectorAll('#subscriptions-list .list-group-item').length === 0) {
+                document.getElementById('subscriptions-list').innerHTML =
+                    '<div class="alert alert-info">Пока еще нет подписок.</div>';
+            }
+
+            // Показываем уведомление об успехе
+            showToast('Вы успешно отписались', 'success');
+        } else {
+            showToast(data.error || 'Произошла ошибка', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Ошибка сети или сервера', 'danger');
+    });
+}
+
+// Функция для показа toast-уведомлений
+function showToast(message, type = 'success') {
+    const toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast show align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+</script>
 {% endblock %}

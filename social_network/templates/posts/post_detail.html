@@ -46,32 +46,41 @@
                     
                     <!-- Форма комментария (изначально скрыта) -->
                     <div class="comment-form mt-3" style="display: none;">
-                        <form method="post" action="{% url 'posts:add_comment' post.id %}" class="mb-3">
+                        <form class="comment-form-ajax mb-3" data-post-id="{{ post.id }}">
                             {% csrf_token %}
                             <div class="input-group">
-                                <input type="text" name="text" class="form-control" placeholder="Write a comment..." required>
-                                <button class="btn btn-outline-primary" type="submit">Post</button>
+                                <input type="text" name="text" class="form-control" placeholder="Напишите комментарий..." required>
+                                <button class="btn btn-outline-primary" type="submit">Опубликовать</button>
                             </div>
                         </form>
                     </div>
                     
                     <!-- Список комментариев -->
                     <div class="comments-section mt-2">
-                        {% for comment in post.comment_set.all %}
+                        {% for comment in post.comments.all %}
                             <div class="d-flex mb-2">
                                 <div class="flex-shrink-0">
                                     <img src="{{ comment.user.profile_picture.url }}" class="rounded-circle me-2" width="32" height="32">
                                 </div>
                                 <div class="flex-grow-1 ms-2">
-                                    <div class="bg-light p-2 rounded">
-                                        <strong>{{ comment.user.username }}</strong>
-                                        <p class="mb-0">{{ comment.text }}</p>
-                                        <small class="text-muted">{{ comment.created_at|timesince }} ago</small>
+                                    <div class="bg-light p-2 rounded d-flex justify-content-between">
+                                        <div>
+                                            <strong>{{ comment.user.username }}</strong>
+                                            <p class="mb-0">{{ comment.text }}</p>
+                                            <small class="text-muted">{{ comment.created_at|timesince }} назад</small>
+                                        </div>
+                                        {% if comment.user == request.user %}
+                                            <button class="btn btn-sm btn-outline-danger delete-comment"
+                                                    data-comment-id="{{ comment.id }}"
+                                                    title="Удалить комментарий">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
                         {% empty %}
-                            <p class="text-muted">No comments yet.</p>
+                            <p class="text-muted">Пока еще нет коментариев.</p>
                         {% endfor %}
                     </div>
                 </div>
@@ -80,11 +89,11 @@
             <!-- Кнопки управления (для автора) -->
             {% if user == post.author %}
                 <div class="d-flex justify-content-end gap-2 mb-4">
-                    <a href="{% url 'posts:edit' post.id %}" class="btn btn-outline-secondary">Edit Post</a>
-                    <form action="{% url 'posts:delete' post.id %}" method="post">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-outline-danger">Delete Post</button>
-                    </form>
+                    <a href="{% url 'posts:edit' post.id %}" class="btn btn-outline-secondary">Редактировать пост</a>
+                    <button class="btn btn-outline-danger delete-post"
+                            data-post-id="{{ post.id }}">
+                        Удалить пост
+                    </button>
                 </div>
             {% endif %}
         </div>
@@ -94,29 +103,61 @@
 <!-- JavaScript для лайков и комментариев -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const CSRF_TOKEN = '{{ csrf_token }}';
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
+    let currentDeleteType = ''; // 'comment' или 'post'
+    let currentDeleteId = '';
+    let currentDeleteElement = null;
+
+    // Функция для показа уведомлений
+    function showToast(message, type = 'success') {
+        const toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast show align-items-center text-white bg-${type} border-0`;
+        toast.setAttribute('role', 'alert');
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
+
     // Обработка лайков
     document.querySelectorAll('.like-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
             const postId = this.dataset.postId;
             const isLiked = this.dataset.liked === 'true';
-            
+
             fetch(`/posts/${postId}/like/`, {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-CSRFToken': CSRF_TOKEN,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({})
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
             .then(data => {
                 if (data.liked !== undefined) {
                     const icon = this.querySelector('i');
                     const countSpan = this.querySelector('.like-count');
-                    
+
                     this.dataset.liked = data.liked;
                     countSpan.textContent = data.likes_count;
-                    
+
                     if (data.liked) {
                         icon.classList.remove('bi-heart');
                         icon.classList.add('bi-heart-fill', 'text-danger');
@@ -126,15 +167,225 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Ошибка при обработке лайка', 'danger');
+            });
         });
     });
-    
+
     // Показать/скрыть форму комментария
     document.querySelectorAll('.comment-toggle').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const form = this.closest('.card-footer').querySelector('.comment-form');
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const cardFooter = this.closest('.card-footer');
+            const form = cardFooter.querySelector('.comment-form');
+
+            // Переключаем видимость формы
+            if (form.style.display === 'none' || !form.style.display) {
+                form.style.display = 'block';
+                // Фокусируем поле ввода при открытии
+                const input = form.querySelector('input[name="text"]');
+                if (input) input.focus();
+            } else {
+                form.style.display = 'none';
+            }
+
+            // Переключаем иконку
+            const icon = this.querySelector('i');
+            if (form.style.display === 'block') {
+                icon.classList.remove('bi-chat');
+                icon.classList.add('bi-chat-dots');
+            } else {
+                icon.classList.remove('bi-chat-dots');
+                icon.classList.add('bi-chat');
+            }
+        });
+    });
+
+    // Обработчик формы комментария
+    document.querySelectorAll('.comment-form-ajax').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const postId = this.dataset.postId;
+            const input = this.querySelector('input[name="text"]');
+            const commentText = input.value.trim();
+            const csrfToken = this.querySelector('[name="csrfmiddlewaretoken"]').value;
+
+            if (!commentText) {
+                showToast('Введите текст комментария', 'warning');
+                return;
+            }
+
+            fetch(`/posts/${postId}/comment/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({text: commentText})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const commentsSection = document.querySelector('.comments-section');
+
+                    // Проверяем, что commentsSection существует
+                    if (!commentsSection) {
+                        console.error('Комментарии не найдены (секция .comments-section отсутствует)');
+                        return;
+                    }
+
+                    // Удаляем сообщение "Нет комментариев", если оно есть
+                    const noCommentsMsg = commentsSection.querySelector('.text-muted');
+                    if (noCommentsMsg) {
+                        noCommentsMsg.remove();
+                    }
+
+                    // Создаем новый комментарий
+                    const newComment = document.createElement('div');
+                    newComment.className = 'd-flex mb-2';
+                    newComment.dataset.commentId = data.comment.id;
+                    newComment.innerHTML = `
+                        <div class="flex-shrink-0">
+                            <img src="{{ request.user.profile_picture.url }}" class="rounded-circle me-2" width="32" height="32">
+                        </div>
+                        <div class="flex-grow-1 ms-2">
+                            <div class="bg-light p-2 rounded d-flex justify-content-between">
+                                <div>
+                                    <strong>${data.comment.user}</strong>
+                                    <p class="mb-0">${data.comment.text}</p>
+                                    <small class="text-muted">только что</small>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger delete-comment"
+                                        data-comment-id="${data.comment.id}"
+                                        title="Удалить комментарий">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+
+                    // Вставляем комментарий в начало списка (если есть куда вставлять)
+                    if (commentsSection.children.length > 0) {
+                        const firstChild = commentsSection.firstChild;
+                        if (firstChild.classList && firstChild.classList.contains('text-muted')) {
+                            commentsSection.replaceChild(newComment, firstChild);
+                        } else {
+                            commentsSection.prepend(newComment);
+                        }
+                    } else {
+                        commentsSection.appendChild(newComment);
+                    }
+
+                    // Обновляем счетчик комментариев
+                    const commentCount = document.querySelector('.comment-count');
+                    if (commentCount) {
+                        commentCount.textContent = data.comments_count;
+                    }
+
+                    input.value = ''; // Очищаем поле ввода
+                    setupDeleteHandler(newComment.querySelector('.delete-comment')); // Вешаем обработчик удаления
+
+                    // Скрываем форму и меняем иконку
+                    const commentForm = this.closest('.comment-form');
+                    if (commentForm) commentForm.style.display = 'none';
+
+                    const commentToggle = document.querySelector('.comment-toggle i');
+                    if (commentToggle) {
+                        commentToggle.classList.remove('bi-chat-dots');
+                        commentToggle.classList.add('bi-chat');
+                    }
+
+                    showToast('Комментарий добавлен', 'success');
+                } else {
+                    throw new Error(data.error || 'Неизвестная ошибка сервера');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast(error.message || 'Ошибка при добавлении комментария', 'danger');
+            });
+        });
+    });
+
+    // Обработчик для удаления комментария
+    function setupDeleteHandler(button) {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            currentDeleteType = 'comment';
+            currentDeleteId = this.dataset.commentId;
+            currentDeleteElement = this.closest('.d-flex.mb-2');
+
+            document.getElementById('modalMessage').textContent =
+                'Вы уверены, что хотите удалить этот комментарий?';
+            deleteModal.show();
+        });
+    }
+
+    // Инициализация обработчиков для существующих комментариев
+    document.querySelectorAll('.delete-comment').forEach(btn => {
+        setupDeleteHandler(btn);
+    });
+
+    // Обработчик для удаления поста
+    document.querySelectorAll('.delete-post').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            currentDeleteType = 'post';
+            currentDeleteId = this.dataset.postId;
+            currentDeleteElement = this.closest('.card');
+
+            document.getElementById('modalMessage').textContent =
+                'Вы уверены, что хотите удалить этот пост? Это действие нельзя отменить.';
+            deleteModal.show();
+        });
+    });
+
+    // Обработчик подтверждения удаления
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        let deleteUrl = '';
+
+        if (currentDeleteType === 'comment') {
+            deleteUrl = `/posts/comment/${currentDeleteId}/delete/`;
+        } else if (currentDeleteType === 'post') {
+            deleteUrl = `/posts/${currentDeleteId}/delete/`;
+        }
+
+        fetch(deleteUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': CSRF_TOKEN,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                if (currentDeleteType === 'comment') {
+                    currentDeleteElement.remove();
+
+                    // Обновляем счетчик комментариев
+                    const commentCount = document.querySelector('.comment-count');
+                    if (commentCount) {
+                        commentCount.textContent = parseInt(commentCount.textContent) - 1;
+                    }
+
+                    showToast('Комментарий удален', 'success');
+                } else if (currentDeleteType === 'post') {
+                    window.location.href = "{% url 'feed:home' %}"; // Перенаправляем на главную после удаления
+                    return;
+                }
+            }
+            deleteModal.hide();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            deleteModal.hide();
+            showToast('Ошибка при удалении', 'danger');
         });
     });
 });

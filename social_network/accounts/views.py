@@ -1,15 +1,18 @@
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Exists, OuterRef
 from django.shortcuts import render, get_object_or_404
-
-# Create your views here.
-
 
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
+from django.urls import reverse_lazy
+from django.views.generic import FormView, RedirectView
 
 from messaging.models import Conversation
-from .forms import CustomUserCreationForm, CustomUserChangeForm
-from .models import CustomUser
+from notifications.models import Notification
+from .forms import CustomUserCreationForm, CustomUserChangeForm, AutoEmailPasswordResetForm
+from .models import CustomUser, Subscription
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
 from .forms import CustomAuthenticationForm
@@ -19,9 +22,14 @@ from django.views.decorators.http import require_POST
 
 @login_required
 def profile_view(request, username=None):
-    profile_user = get_object_or_404(CustomUser, username=username)
+    if username is None:
+        # Если username не указан, показываем профиль текущего пользователя
+        profile_user = request.user
+    else:
+        # Иначе показываем профиль указанного пользователя
+        profile_user = get_object_or_404(CustomUser, username=username)
 
-    # Добавьте этот код для подсчета непрочитанных сообщений
+    # Подсчет непрочитанных сообщений (только для личных бесед)
     unread_count = 0
     if request.user.is_authenticated and request.user != profile_user:
         conversation = Conversation.objects.filter(
@@ -37,13 +45,7 @@ def profile_view(request, username=None):
                 sender=request.user
             ).count()
 
-    if username is None:
-        # Если username не указан, показываем профиль текущего пользователя
-        profile_user = request.user
-    else:
-        # Иначе показываем профиль указанного пользователя
-        profile_user = get_object_or_404(CustomUser, username=username)
-
+    # Проверка подписки
     is_subscribed = False
     if request.user.is_authenticated and request.user != profile_user:
         is_subscribed = request.user.subscriptions.filter(target_user=profile_user).exists()
@@ -53,6 +55,7 @@ def profile_view(request, username=None):
         'is_subscribed': is_subscribed,
         'unread_count': unread_count,
     })
+
 def register_view(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST, request.FILES)
@@ -107,13 +110,18 @@ def toggle_subscription(request, username):
         request.user.unsubscribe(target_user)
     else:
         request.user.subscribe(target_user)
+        Notification.objects.create(
+            user=target_user,
+            sender=request.user,
+            notification_type='follow',  # Используем 'follow' вместо 'subscription'
+            message=f"{request.user.username} подписался(ась) на вас"
+        )
 
-    # Возвращаем обновленные данные
     return JsonResponse({
         'new_status': not is_subscribed,
-        'subscribers_count': target_user.subscribers_count
+        'subscribers_count': target_user.subscribers_count,
+        'success': True
     })
-
 
 @login_required
 def subscriptions_list(request, username):
@@ -133,3 +141,39 @@ def subscribers_list(request, username):
         'profile_user': user,
         'subscribers': subscribers
     })
+
+User = get_user_model()
+
+
+@login_required
+def user_list(request):
+    users = CustomUser.objects.exclude(id=request.user.id).annotate(
+        is_subscribed=Exists(
+            Subscription.objects.filter(
+                subscriber=request.user,
+                target_user=OuterRef('pk')
+            )
+        )
+    ).order_by('-date_joined')
+
+    return render(request, 'accounts/user_list.html', {
+        'users': users,
+    })
+
+
+class InstantPasswordResetView(LoginRequiredMixin, RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        # Создаем временную форму и отправляем письмо
+        from django.contrib.auth.forms import PasswordResetForm
+        form = PasswordResetForm(data={'email': self.request.user.email})
+        if form.is_valid():
+            form.save(
+                request=self.request,
+                email_template_name='accounts/registration/password_reset_email.html',
+                subject_template_name='accounts/registration/password_reset_subject.txt'
+            )
+            messages.success(self.request, f"Ссылка для сброса пароля отправлена на {self.request.user.email}")
+        else:
+            messages.error(self.request, "Ошибка при отправке письма")
+
+        return reverse_lazy('accounts:password_reset_done')

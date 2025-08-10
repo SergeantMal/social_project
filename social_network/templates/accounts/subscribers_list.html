@@ -4,9 +4,9 @@
 <div class="container">
     <div class="row">
         <div class="col-md-8 offset-md-2">
-            <h2>Subscribers of {{ profile_user.username }}</h2>
-            <p class="text-muted">{{ subscribers.count }} subscribers</p>
-            
+            <h2>Подписчики {{ profile_user.username }}</h2>
+            <p class="text-muted">{{ subscribers.count }} подписчиков</p>
+
             <div class="list-group mt-3">
                 {% for sub in subscribers %}
                 <div class="list-group-item">
@@ -17,7 +17,7 @@
                     </div>
                 </div>
                 {% empty %}
-                <div class="alert alert-info">No subscribers yet.</div>
+                <div class="alert alert-info">Пока еще нет подписчиков.</div>
                 {% endfor %}
             </div>
         </div>

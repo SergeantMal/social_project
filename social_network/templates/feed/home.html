@@ -6,10 +6,44 @@
     <div class="row">
         <div class="col-md-8 offset-md-2">
             {% if user.is_authenticated %}
-                <div class="mb-4">
-                    <a href="{% url 'posts:create' %}" class="btn btn-primary">Create Post</a>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-0">
+                            {% if feed_type == 'subscriptions' %}
+                                <i class="bi bi-people-fill text-primary"></i> Мои подписки
+                            {% else %}
+                                <i class="bi bi-globe text-primary"></i> Все посты
+                            {% endif %}
+                        </h4>
+                    </div>
+                    <div class="d-flex gap-2">
+                        {% if feed_type == 'subscriptions' %}
+                            <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-primary">
+                                <i class="bi bi-compass"></i> Исследовать пользователей
+                            </a>
+                        {% endif %}
+                        <a href="{% url 'posts:create' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-lg"></i> Создать пост
+                        </a>
+                    </div>
+                </div>
+
+                {% if feed_type == 'all' and not posts %}
+                    <div class="alert alert-info">
+                        Пока нет постов. Будьте первым!
+                    </div>
+                {% elif feed_type == 'subscriptions' and not posts %}
+                    <div class="alert alert-info">
+                        Вы ни на кого не подписаны. Исследуйте пользователей.
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-info mb-4">
+                    <h4><i class="bi bi-globe"></i> Все посты</h4>
+                    <p class="mb-0">Авторизуйтесь чтобы видеть персональный контент и публиковать посты</p>
                 </div>
             {% endif %}
+
 
             {% for post in posts %}
                 <div class="card mb-4">
@@ -51,30 +85,50 @@
                             </a>
                         </div>
 
-                        <!-- Краткий список комментариев (первые 2) -->
-                        {% if post.comments_count > 0 %}
-                            <div class="comments-preview mt-2">
-                                {% for comment in post.comment_set.all|slice:":2" %}
-                                    <div class="d-flex mb-1">
-                                        <div class="flex-grow-1">
-                                            <strong>{{ comment.user.username }}</strong>: {{ comment.text|truncatechars:30 }}
+                        <div class="comment-section mt-3">
+
+                            <!-- Форма для добавления комментария -->
+                            <form class="comment-form mb-3" data-post-id="{{ post.id }}">
+                                {% csrf_token %}
+                                <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                                <div class="input-group">
+                                    <input type="text" name="text" class="form-control" placeholder="Напишите коментарий..." required>
+                                    <button class="btn btn-primary" type="submit">Опубликовать</button>
+                                </div>
+                            </form>
+
+                            <!-- Список комментариев -->
+                            <div class="comments-list">
+                                {% for comment in post.comments.all|slice:":2" %}
+                                    <div class="d-flex justify-content-between align-items-center mb-2" data-comment-id="{{ comment.id }}">
+                                        <div>
+                                            <strong>{{ comment.user.username }}</strong>: {{ comment.text }}
                                         </div>
+                                        {% if comment.user == request.user %}
+                                            <button class="btn btn-sm btn-outline-danger delete-comment"
+                                                    data-comment-id="{{ comment.id }}"
+                                                    title="Удалить комментарий">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        {% endif %}
                                     </div>
                                 {% endfor %}
+
                                 {% if post.comments_count > 2 %}
-                                    <a href="{% url 'posts:detail' post.id %}" class="text-muted small">View all {{ post.comments_count }} comments</a>
+                                    <a href="{% url 'posts:detail' post.id %}" class="text-muted small">Смотреть все {{ post.comments_count }} comments</a>
                                 {% endif %}
                             </div>
-                        {% endif %}
+                        </div>
+
 
                         <!-- Кнопки управления (для автора) -->
                         {% if user == post.author %}
                             <div class="d-flex justify-content-end gap-2 mt-3">
-                                <a href="{% url 'posts:edit' post.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                <form action="{% url 'posts:delete' post.id %}" method="post" class="d-inline">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                </form>
+                                <a href="{% url 'posts:edit' post.id %}" class="btn btn-sm btn-outline-secondary">Редактировать</a>
+                                <button class="btn btn-sm btn-outline-danger delete-post"
+                                        data-post-id="{{ post.id }}">
+                                    Удалить
+                                </button>
                             </div>
                         {% endif %}
                     </div>
@@ -82,9 +136,9 @@
             {% empty %}
                 <div class="card">
                     <div class="card-body text-center">
-                        <p class="text-muted">No posts yet. Create the first one!</p>
+                        <p class="text-muted">Еще нет постов. Опубликуйте первый!</p>
                         {% if user.is_authenticated %}
-                            <a href="{% url 'posts:create' %}" class="btn btn-primary">Create Post</a>
+                            <a href="{% url 'posts:create' %}" class="btn btn-primary">Создать пост</a>
                         {% endif %}
                     </div>
                 </div>
@@ -96,6 +150,34 @@
 <!-- JavaScript для лайков -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const CSRF_TOKEN = '{{ csrf_token }}';
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
+    let currentDeleteType = '';
+    let currentDeleteId = '';
+    let currentDeleteElement = null;
+
+    // Функция для показа уведомлений
+    function showToast(message, type = 'success') {
+        const toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast show align-items-center text-white bg-${type} border-0`;
+        toast.setAttribute('role', 'alert');
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
+
     // Обработка лайков
     document.querySelectorAll('.like-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
@@ -106,12 +188,15 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch(`/posts/${postId}/like/`, {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-CSRFToken': CSRF_TOKEN,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({})
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
             .then(data => {
                 if (data.liked !== undefined) {
                     const icon = this.querySelector('i');
@@ -129,7 +214,199 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Ошибка при обработке лайка', 'danger');
+            });
+        });
+    });
+
+    // Обработчик для удаления комментария
+    function setupDeleteHandler(button) {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            currentDeleteType = 'comment';
+            currentDeleteId = this.dataset.commentId;
+            currentDeleteElement = this.closest('.d-flex.justify-content-between.align-items-center.mb-2');
+            currentDeletePost = this.closest('.card'); // Сохраняем родительский пост
+
+            document.getElementById('modalMessage').textContent =
+                'Вы уверены, что хотите удалить этот комментарий?';
+            deleteModal.show();
+        });
+    }
+
+    // Инициализация обработчиков удаления
+    document.querySelectorAll('.delete-comment').forEach(btn => {
+        setupDeleteHandler(btn);
+    });
+
+    // Обработчик для удаления поста
+    document.querySelectorAll('.delete-post').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            currentDeleteType = 'post';
+            currentDeleteId = this.dataset.postId;
+            currentDeleteElement = this.closest('.card');
+
+            document.getElementById('modalMessage').textContent =
+                'Вы уверены, что хотите удалить этот пост? Это действие нельзя отменить.';
+            deleteModal.show();
+        });
+    });
+
+    // Обработчик подтверждения удаления
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        let deleteUrl = '';
+
+        if (currentDeleteType === 'comment') {
+            deleteUrl = `/posts/comment/${currentDeleteId}/delete/`;
+        } else if (currentDeleteType === 'post') {
+            deleteUrl = `/posts/${currentDeleteId}/delete/`;
+        }
+
+        fetch(deleteUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': CSRF_TOKEN,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                if (currentDeleteType === 'comment') {
+                    // Удаляем только конкретный комментарий
+                    if (currentDeleteElement && currentDeleteElement.parentNode) {
+                        currentDeleteElement.remove();
+                    }
+
+                    // Обновляем счетчик комментариев
+                    const commentCount = currentDeletePost.querySelector('.comment-count');
+                    if (commentCount) {
+                        const newCount = parseInt(commentCount.textContent) - 1;
+                        commentCount.textContent = newCount;
+
+                        // Проверяем список комментариев
+                        const commentsList = currentDeletePost.querySelector('.comments-list');
+                        const comments = commentsList.querySelectorAll('[data-comment-id]');
+
+                        if (newCount === 0) {
+                            // Если комментариев не осталось
+                            commentsList.innerHTML = '<div class="text-muted">Нет комментариев</div>';
+                        } else if (newCount <= 2) {
+                            // Если стало 2 или меньше комментариев, удаляем ссылку "Смотреть все"
+                            const viewAllLink = commentsList.querySelector('a.small');
+                            if (viewAllLink) {
+                                viewAllLink.remove();
+                            }
+                        }
+                    }
+
+                    showToast('Комментарий удален', 'success');
+                } else if (currentDeleteType === 'post') {
+                    window.location.reload();
+                    return;
+                }
+            }
+            deleteModal.hide();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            deleteModal.hide();
+            showToast('Ошибка при удалении', 'danger');
+        });
+    });
+
+    // Обработчик формы комментария
+    document.querySelectorAll('.comment-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const postId = this.dataset.postId;
+            const input = this.querySelector('input[name="text"]');
+            const commentText = input.value.trim();
+            const csrfToken = this.querySelector('[name="csrfmiddlewaretoken"]').value;
+
+            if (!commentText) {
+                showToast('Введите текст комментария', 'warning');
+                return;
+            }
+
+            fetch(`/posts/${postId}/comment/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({text: commentText})
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Ошибка сети');
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    const commentsContainer = this.closest('.comment-section');
+                    const commentsList = commentsContainer.querySelector('.comments-list');
+
+                    // Удаляем сообщение "Нет комментариев" если есть
+                    const noCommentsMsg = commentsList.querySelector('.text-muted:not(.small)');
+                    if (noCommentsMsg) noCommentsMsg.remove();
+
+                    // Создаем новый комментарий
+                    const newComment = document.createElement('div');
+                    newComment.className = 'd-flex justify-content-between align-items-center mb-2';
+                    newComment.dataset.commentId = data.comment.id;
+                    newComment.innerHTML = `
+                        <div>
+                            <strong>${data.comment.user}</strong>: ${data.comment.text}
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger delete-comment"
+                                data-comment-id="${data.comment.id}"
+                                title="Удалить комментарий">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    `;
+
+                    // Вставляем комментарий В НАЧАЛО списка
+                    const firstComment = commentsList.firstElementChild;
+                    if (firstComment) {
+                        commentsList.insertBefore(newComment, firstComment);
+                    } else {
+                        commentsList.appendChild(newComment);
+                    }
+
+                    // Обновляем счетчик
+                    const commentCount = commentsContainer.querySelector('.comment-count');
+                    if (commentCount) {
+                        commentCount.textContent = data.comments_count;
+                    }
+
+                    // Если комментариев стало больше 2, добавляем ссылку "Смотреть все"
+                    if (data.comments_count > 2 && !commentsList.querySelector('a.small')) {
+                        const viewAllLink = document.createElement('a');
+                        viewAllLink.href = `/posts/${postId}/`;
+                        viewAllLink.className = 'text-muted small';
+                        viewAllLink.textContent = `Смотреть все ${data.comments_count} комментариев`;
+                        commentsList.appendChild(viewAllLink);
+                    }
+
+                    // Очищаем поле ввода
+                    input.value = '';
+
+                    // Добавляем обработчик для новой кнопки удаления
+                    setupDeleteHandler(newComment.querySelector('.delete-comment'));
+
+                    showToast('Комментарий добавлен', 'success');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Ошибка при добавлении комментария', 'danger');
+            });
         });
     });
 });

@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
+{% load custom_filters %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-8 offset-md-2">
-            <h2>Your Conversations</h2>
+            <h2>Ваши переписки</h2>
             <div class="list-group">
                 {% for conversation in conversations %}
                     {% for participant in conversation.participants.all %}
@@ -19,7 +20,7 @@
                                         {% endif %}
                                         <strong>{{ participant.username }}</strong>
                                     </div>
-                                    <small class="text-muted">{{ conversation.updated_at|timesince }} ago</small>
+                                    <small class="text-muted">{{ conversation.updated_at|russian_timesince }}</small>
                                 </div>
                                 <p class="mb-0 mt-1">
                                     {% with conversation.messages.last as last_message %}
@@ -32,7 +33,7 @@
                         {% endif %}
                     {% endfor %}
                 {% empty %}
-                    <div class="alert alert-info">No conversations yet.</div>
+                    <div class="alert alert-info">Пока еще нет переписок.</div>
                 {% endfor %}
             </div>
         </div>

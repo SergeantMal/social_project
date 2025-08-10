@@ -1,0 +1,113 @@
+{% load static %}
+{% load custom_filters %}
+<nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top">
+    <div class="container">
+        <a class="navbar-brand" href="{% url 'feed:home' %}">Социальная сеть Minisocial</a>
+        <div class="navbar-nav">
+            {% if user.is_authenticated %}
+                <!-- Добавляем переключатель ленты -->
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {% if request.path == '/feed/subscriptions/' or request.path == '/' %}active{% endif %}"
+                       href="#" id="feedDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-newspaper"></i> Лента
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item {% if request.path == '/' %}active{% endif %}"
+                               href="{% url 'feed:home' %}">
+                               <i class="bi bi-globe"></i> Все посты
+                            </a>
+                        </li>
+                        <li><a class="dropdown-item {% if request.path == '/feed/subscriptions/' %}active{% endif %}"
+                               href="{% url 'feed:subscriptions' %}">
+                               <i class="bi bi-people-fill"></i> Подписки
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <!-- Уведомления -->
+                <div class="nav-item dropdown">
+                    <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell"></i>
+                        {% if unread_notifications_count > 0 %}
+                            <span class="badge rounded-pill bg-danger pulse-animation">
+                                {{ unread_notifications_count }}
+                                <span class="visually-hidden">Непрочитанные уведомления</span>
+                            </span>
+                        {% endif %}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end p-0" aria-labelledby="notificationsDropdown" style="width: 350px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header p-2 border-bottom d-flex justify-content-between align-items-center">
+                            <span>Уведомления</span>
+                            {% if unread_notifications_count > 0 %}
+                                <span class="badge bg-primary rounded-pill">{{ unread_notifications_count }} новых</span>
+                            {% endif %}
+                        </li>
+                        <div id="notifications-container">
+                            {% for notification in recent_notifications %}
+                                <li class="notification-item {% if not notification.is_read %}unread-notification{% endif %}"
+                                    data-notification-id="{{ notification.id }}">
+                                    <a class="dropdown-item d-flex align-items-center p-2" href="{{ notification.get_absolute_url }}">
+                                        <div class="position-relative me-2">
+                                            <img src="{{ notification.sender.profile_picture.url }}"
+                                                 class="rounded-circle" width="40" height="40">
+                                            {% if not notification.is_read %}
+                                                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+                                                    <span class="visually-hidden">Новое уведомление</span>
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between">
+                                                <strong>{{ notification.sender.username }}</strong>
+                                                <small>{{ notification.created_at|russian_timesince }}</small>
+                                            </div>
+                                            <div>
+                                                {% if notification.notification_type == 'follow' %}
+                                                    Подписался(ась) на вас
+                                                {% elif notification.notification_type == 'like' %}
+                                                    Лайкнул(а) ваш пост
+                                                {% elif notification.notification_type == 'comment' %}
+                                                    Прокомментировал(а) ваш пост
+                                                {% elif notification.notification_type == 'post' %}
+                                                    Опубликовал новый пост
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </a>
+                                </li>
+                            {% empty %}
+                                <li class="dropdown-item text-muted text-center p-3">Нет уведомлений</li>
+                            {% endfor %}
+                        </div>
+                        <li class="dropdown-footer text-center p-2 border-top">
+                            <a href="{% url 'notifications:all' %}" class="text-primary">Смотреть все уведомления</a>
+                            {% if unread_notifications_count > 0 %}
+                                <button class="btn btn-sm btn-outline-primary ms-2" id="mark-all-read">
+                                    Отметить все как прочитанные
+                                </button>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </div>
+
+                <a class="nav-link" href="{% url 'messaging:conversation_list' %}">Сообщения
+                    {% if unread_messages_count > 0 %}
+                        <span class="badge bg-danger rounded-pill">{{ unread_messages_count }}</span>
+                    {% endif %}
+                </a>
+                <a class="nav-link {% if request.path == '/accounts/profile/' or request.path == '/accounts/profile' %}active{% endif %}"
+                   href="{% url 'accounts:profile' %}">
+                   <i class="bi bi-person"></i> Профиль
+                </a>
+                <a class="nav-link {% if request.path == '/accounts/profile/edit/' %}active{% endif %}"
+                   href="{% url 'accounts:profile_edit' %}">
+                   <i class="bi bi-pencil"></i> Редактировать профиль
+                </a>
+                <a class="nav-link" href="{% url 'accounts:logout' %}">Выйти</a>
+            {% else %}
+                <a class="nav-link" href="{% url 'accounts:login' %}">Войти</a>
+                <a class="nav-link" href="{% url 'accounts:register' %}">Регистрация</a>
+            {% endif %}
+        </div>
+    </div>
+</nav>

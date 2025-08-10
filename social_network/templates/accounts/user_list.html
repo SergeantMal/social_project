@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <h2 class="mb-4"><i class="bi bi-people"></i> Исследовать пользователей</h2>
+
+            {% for user in users %}
+                <div class="card mb-3">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <a href="{% url 'accounts:user_profile' user.username %}" class="text-decoration-none d-flex align-items-center">
+                                {% if user.profile_picture %}
+                                    <img src="{{ user.profile_picture.url }}" class="rounded-circle me-2" width="40" height="40">
+                                {% else %}
+                                    <div class="rounded-circle bg-secondary d-inline-block me-2" style="width: 40px; height: 40px;"></div>
+                                {% endif %}
+                                <strong>{{ user.username }}</strong>
+                            </a>
+                        </div>
+                        {% if request.user != user %}
+                            {% with is_subscribed=user.is_subscribed %}
+                                <div class="subscription-container" data-user="{{ user.username }}">
+                                    <span class="me-2 text-muted small">
+                                        <span class="subscribers-count">{{ user.subscribers_count }}</span> подписчиков
+                                    </span>
+                                    <button class="btn subscribe-btn {% if is_subscribed %}btn-outline-danger{% else %}btn-primary{% endif %}"
+                                            data-initial-state="{% if is_subscribed %}subscribed{% else %}not-subscribed{% endif %}">
+                                        {% if is_subscribed %}Отписаться{% else %}Подписаться{% endif %}
+                                    </button>
+                                </div>
+                            {% endwith %}
+                        {% endif %}
+                    </div>
+                </div>
+            {% empty %}
+                <div class="alert alert-info">Пользователи не найдены.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Функция для обновления состояния кнопки
+    function updateSubscriptionButton(button, isSubscribed) {
+        if (isSubscribed) {
+            button.classList.remove('btn-primary');
+            button.classList.add('btn-outline-danger');
+            button.textContent = 'Отписаться';
+        } else {
+            button.classList.remove('btn-outline-danger');
+            button.classList.add('btn-primary');
+            button.textContent = 'Подписаться';
+        }
+        button.dataset.currentState = isSubscribed ? 'subscribed' : 'not-subscribed';
+    }
+
+    // Инициализация всех кнопок при загрузке
+    document.querySelectorAll('.subscribe-btn').forEach(btn => {
+        const initialState = btn.dataset.initialState === 'subscribed';
+        updateSubscriptionButton(btn, initialState);
+
+        // Обработчик клика
+        btn.addEventListener('click', function() {
+            const container = this.closest('.subscription-container');
+            const username = container.dataset.user;
+            const isCurrentlySubscribed = this.dataset.currentState === 'subscribed';
+
+            fetch(`/accounts/profile/${username}/subscribe/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Network error');
+                return response.json();
+            })
+            .then(data => {
+                if (data.new_status !== undefined) {
+                    // Обновляем состояние кнопки
+                    updateSubscriptionButton(this, data.new_status);
+
+                    // Обновляем счетчик подписчиков
+                    const countElement = container.querySelector('.subscribers-count');
+                    if (countElement && data.subscribers_count !== undefined) {
+                        countElement.textContent = data.subscribers_count;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ошибка обновления подписки. Пожалуйста попробуйте снова.');
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

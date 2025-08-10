@@ -2,14 +2,34 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-    <div class="row">
-        <div class="col-md-6 offset-md-3">
-            <h2>Edit Profile</h2>
-            <form method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                {{ form|crispy }}
-                <button type="submit" class="btn btn-primary mt-3">Save</button>
-            </form>
-        </div>
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <h2>Редактировать профиль</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form|crispy }}
+
+            <div class="card mt-3 mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Смена пароля</h5>
+                    <p class="card-text">Если вы хотите изменить пароль, нажмите кнопку ниже:</p>
+                    <a href="{% url 'accounts:password_reset_instant' %}" class="btn btn-warning"
+                       onclick="showLoading(this)">
+                        Сбросить пароль по email
+                    </a>
+                    <small class="text-muted d-block mt-2">На ваш email будет отправлена ссылка для смены пароля</small>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+        </form>
     </div>
+</div>
+
+<script>
+function showLoading(button) {
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Отправка...';
+    button.disabled = true;
+}
+</script>
 {% endblock %}

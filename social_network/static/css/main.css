@@ -1,7 +1,143 @@
+/* Закрепление header и footer */
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.content-wrapper {
+    flex: 1;
+}
+
+/* Для sticky header */
+.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+}
+
+/* Для фиксированного footer */
+.fixed-footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}
+
 .post-image {
     max-width:400px;
     max-height: 400px;
     width: auto;
     height: auto;
     display: block;
+}
+
+.comment-section {
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+
+.comments-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Стили для кнопки удаления */
+.delete-comment {
+    width: 24px;        /* Фиксированная ширина */
+    height: 24px;       /* Фиксированная высота */
+    padding: 0;         /* Убираем внутренние отступы */
+    display: flex;      /* Для центрирования иконки */
+    align-items: center;/* Вертикальное центрирование */
+    justify-content: center; /* Горизонтальное центрирование */
+    border-radius: 4px; /* Скругление углов */
+    opacity: 0.7;
+    transition: opacity 0.2s, background-color 0.2s;
+    flex-shrink: 0;     /* Запрещаем уменьшение */
+}
+
+.delete-comment:hover {
+    opacity: 1;
+    background-color: rgba(220, 53, 69, 0.1); /* Легкий красный фон при наведении */
+}
+
+/* Для иконки внутри кнопки */
+.delete-comment i {
+    font-size: 0.875rem; /* Фиксированный размер иконки */
+    margin: 0;           /* Убираем отступы у иконки */
+}
+/* Анимация пульсации для иконки уведомлений */
+.pulse-animation {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Стиль для непрочитанных уведомлений */
+.unread-notification {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-left: 3px solid #0d6efd;
+}
+
+/* Эффект при наведении */
+.notification-item:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Стили для модального окна */
+#deleteConfirmationModal .modal-content {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+}
+
+#deleteConfirmationModal .modal-header {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+#deleteConfirmationModal .modal-footer {
+    border-top: none;
+    padding-top: 0;
+}
+
+#confirmDeleteBtn {
+    min-width: 100px;
+}
+
+.toast {
+    transition: opacity 0.3s ease;
+}
+
+.toast.show {
+    opacity: 1;
+}
+
+.toast.hide {
+    opacity: 0;
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+/* Стили для непрочитанных уведомлений */
+.unread-notification {
+    background-color: #f8f9fa;
+    border-left: 4px solid #0d6efd;
+}
+
+.unread-notification:hover {
+    background-color: #e9ecef;
+}
+
+/* Иконка нового уведомления */
+.position-absolute.bg-danger {
+    min-width: 12px;
+    min-height: 12px;
 }

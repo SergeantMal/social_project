@@ -4,12 +4,12 @@
 {% block content %}
 <div class="row">
     <div class="col-md-8 offset-md-2">
-        <h2>Edit Post</h2>
+        <h2>Отредактировать пост</h2>
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             {{ form|crispy }}
-            <button type="submit" class="btn btn-primary">Save Changes</button>
-            <a href="{% url 'posts:delete' post.id %}" class="btn btn-danger">Delete Post</a>
+            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+            <a href="{% url 'posts:delete' post.id %}" class="btn btn-danger">Удалить пост</a>
         </form>
     </div>
 </div>

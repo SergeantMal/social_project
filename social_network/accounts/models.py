@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.files.storage import default_storage
 
 # Create your models here.
 
@@ -45,6 +46,11 @@ class CustomUser(AbstractUser):
     def can_receive_message_from(self, user):
         """Проверяет, может ли пользователь получить сообщение"""
         return self != user and self.is_active
+
+    def get_profile_picture(self):
+        if self.profile_picture and default_storage.exists(self.profile_picture.name):
+            return self.profile_picture.url
+        return '/static/images/default-profile.png'
 
 
 class Subscription(models.Model):

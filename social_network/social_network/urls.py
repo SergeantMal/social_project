@@ -26,6 +26,7 @@ urlpatterns = [
     path('', include('feed.urls')),
     path('posts/', include('posts.urls')),
     path('messages/', include('messaging.urls')),
+    path('notifications/', include('notifications.urls')),
 ]
 
 # Для разработки (DEBUG=True) добавляем обработку статических и медиа-файлов

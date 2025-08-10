@@ -4,42 +4,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Social Network</title>
+    <title>Социальная сеть Minisocial</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <style>
+        html, body {
+            height: 100%;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+        .content-wrapper {
+            flex: 1 0 auto;
+        }
+        .footer {
+            flex-shrink: 0;
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <div class="container">
-            <a class="navbar-brand" href="{% url 'feed:home' %}">Social Network</a>
-            <div class="navbar-nav">
-                {% if user.is_authenticated %}
-                    <a class="nav-link" href="{% url 'messaging:conversation_list' %}">Messages
-                        {% if unread_messages_count > 0 %}
-                            <span class="badge bg-danger rounded-pill">{{ unread_messages_count }}</span>
-                        {% endif %}
-                    </a>
-                    <a class="nav-link" href="{% url 'accounts:profile' %}">Profile</a>
-                    <a class="nav-link" href="{% url 'accounts:profile_edit' %}">Edit profile</a>
-                    <a class="nav-link" href="{% url 'accounts:logout' %}">Logout</a>
-                {% else %}
-                    <a class="nav-link" href="{% url 'accounts:login' %}">Login</a>
-                    <a class="nav-link" href="{% url 'accounts:register' %}">Register</a>
-                {% endif %}
+    <div class="content-wrapper">
+        {% include 'header.html' %}
+
+        <div class="container mt-4">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <div id="toastContainer" class="position-fixed bottom-0 end-0 p-3" style="z-index: 11"></div>
+
+    <!-- Модальное окно подтверждения удаления -->
+    <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Подтверждение удаления</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="modalMessage">Вы уверены, что хотите удалить этот комментарий?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Удалить</button>
+                </div>
             </div>
         </div>
-    </nav>
-
-    <div class="container mt-4">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-        {% block content %}{% endblock %}
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -47,5 +68,94 @@
     // Глобальная переменная с CSRF токеном
     const CSRF_TOKEN = '{{ csrf_token }}';
     </script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        function showToast(message, type = 'success') {
+            const toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) return;
+
+            const toast = document.createElement('div');
+            toast.className = `toast show align-items-center text-white bg-${type} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+
+            toastContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 5000);
+        }
+
+        // Обработчик кликов на уведомлениях
+        document.querySelectorAll('.notification-item').forEach(item => {
+            item.addEventListener('click', async function(e) {
+                e.preventDefault();
+                const notificationId = this.dataset.notificationId;
+                const notificationLink = this.querySelector('a').href;
+
+                try {
+                    const contentCheck = await fetch(notificationLink, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+
+                    if (contentCheck.ok) {
+                        await fetch(`/notifications/read/${notificationId}/`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': CSRF_TOKEN }
+                        });
+                        window.location.href = notificationLink;
+                    } else {
+                        showToast('Этот пост или комментарий был удалён', 'warning');
+                        await fetch(`/notifications/read/${notificationId}/`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': CSRF_TOKEN }
+                        });
+                        this.classList.remove('unread-notification');
+                        updateUnreadBadge();
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('Произошла ошибка при проверке уведомления', 'danger');
+                }
+            });
+        });
+
+        function updateUnreadBadge() {
+            const unreadBadge = document.querySelector('.dropdown-header .badge');
+            if (unreadBadge) {
+                const count = parseInt(unreadBadge.textContent) - 1;
+                if (count > 0) {
+                    unreadBadge.textContent = count;
+                } else {
+                    unreadBadge.remove();
+                }
+            }
+        }
+
+        const markAllReadBtn = document.getElementById('mark-all-read');
+        if (markAllReadBtn) {
+            markAllReadBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                fetch('/notifications/read-all/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json'
+                    }
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    }
+                });
+            });
+        }
+    });
+    </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
