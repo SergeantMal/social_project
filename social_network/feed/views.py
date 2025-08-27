@@ -1,5 +1,5 @@
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.shortcuts import render
 from posts.models import Post
 from accounts.models import Subscription
@@ -34,10 +34,21 @@ def search(request):
     return render(request, 'feed/search_results.html', results)
 
 
-# Обновим home view для поддержки поиска/фильтрации
 def home(request):
     query = request.GET.get('q', '').strip()
-    posts_list = Post.objects.all().order_by('-created_at')
+    sort_by = request.GET.get('sort', 'newest')  # Получаем параметр сортировки
+
+    posts_list = Post.objects.all()
+
+    # Применяем сортировку
+    if sort_by == 'oldest':
+        posts_list = posts_list.order_by('created_at')  # Старые сверху
+    elif sort_by == 'most_liked':
+        posts_list = posts_list.annotate(likes_total=Count('likes')).order_by('-likes_total', '-created_at')
+    elif sort_by == 'most_commented':
+        posts_list = posts_list.annotate(comments_total=Count('comments')).order_by('-comments_total', '-created_at')
+    else:  # newest (по умолчанию)
+        posts_list = posts_list.order_by('-created_at')  # Новые сверху
 
     # Если есть поисковый запрос, фильтруем посты
     if query:
@@ -54,9 +65,9 @@ def home(request):
     return render(request, 'feed/home.html', {
         'posts': posts,
         'feed_type': 'all',
-        'search_query': query
+        'search_query': query,
+        'current_sort': sort_by  # Передаем текущий тип сортировки
     })
-
 
 @login_required
 def subscriptions_feed(request):
