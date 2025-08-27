@@ -5,19 +5,7 @@
 <div class="container">
     <div class="row">
         <div class="col-md-8 offset-md-2">
-            <!-- Поисковая форма и заголовок -->
             <div class="row mb-4">
-                <div class="col-md-6">
-                    <form method="GET" action="{% url 'feed:search' %}">
-                        <div class="input-group">
-                            <input type="text" name="q" class="form-control"
-                                   placeholder="Поиск постов и пользователей..." value="{{ search_query }}">
-                            <button class="btn btn-outline-secondary" type="submit">
-                                <i class="bi bi-search"></i>
-                            </button>
-                        </div>
-                    </form>
-                </div>
             </div>
 
             {% if user.is_authenticated %}

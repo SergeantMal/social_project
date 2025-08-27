@@ -1,23 +1,21 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Exists, OuterRef
-from django.shortcuts import render, get_object_or_404
-
+from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.urls import reverse_lazy
-from django.views.generic import FormView, RedirectView
-
+from django.views.generic import RedirectView
 from messaging.models import Conversation
 from notifications.models import Notification
-from .forms import CustomUserCreationForm, CustomUserChangeForm, AutoEmailPasswordResetForm
-from .models import CustomUser, Subscription
+from .forms import CustomUserCreationForm, CustomUserChangeForm
+from .models import CustomUser
 from django.contrib import messages
-from django.contrib.auth.views import LoginView
-from .forms import CustomAuthenticationForm
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.contrib.auth.views import LoginView
+from .forms import CustomAuthenticationForm
+
 
 
 @login_required
@@ -78,9 +76,6 @@ def profile_edit_view(request):
     else:
         form = CustomUserChangeForm(instance=request.user)
     return render(request, 'accounts/profile_edit.html', {'form': form})
-
-from django.contrib.auth.views import LoginView
-from .forms import CustomAuthenticationForm
 
 
 class CustomLoginView(LoginView):

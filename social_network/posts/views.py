@@ -5,7 +5,7 @@ from .models import Post
 from .forms import PostCreateForm, PostEditForm, CommentForm
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from .models import Like, Comment
+from .models import Comment
 from notifications.models import Notification
 import json
 

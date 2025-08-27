@@ -2,11 +2,10 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
-from django.db.models import Q
-
 from accounts.models import CustomUser
-from .models import Conversation, Message
+from .models import Conversation
 from .forms import MessageForm
+from django.core.exceptions import PermissionDenied
 
 User = get_user_model()
 
@@ -65,7 +64,6 @@ def conversation_detail(request, user_id):
         'form': form
     })
 
-from django.core.exceptions import PermissionDenied
 
 def check_message_permission(view_func):
     """Декоратор для проверки прав на отправку сообщения"""
