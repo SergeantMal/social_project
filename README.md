@@ -85,7 +85,7 @@
 
 ### 1. Клонирование репозитория
 ```bash
-git clone https://github.com/SergeantMal/social_network.git
+git clone https://github.com/SergeantMal/social_project.git
 cd social_network
 ```
 
