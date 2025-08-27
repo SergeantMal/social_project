@@ -41,6 +41,10 @@ class Post(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['text']),
+            models.Index(fields=['created_at']),
+        ]
 
     def __str__(self):
         return f'Post by {self.author.username} at {self.created_at}'

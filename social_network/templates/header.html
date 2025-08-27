@@ -3,6 +3,15 @@
 <nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top">
     <div class="container">
         <a class="navbar-brand" href="{% url 'feed:home' %}">Социальная сеть Minisocial</a>
+        <form class="d-flex ms-3" method="GET" action="{% url 'feed:search' %}">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control" placeholder="Поиск постов и пользователей..."
+                       value="{{ request.GET.q }}" style="width: 250px;">
+                <button class="btn btn-outline-primary" type="submit">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </form>
         <div class="navbar-nav">
             {% if user.is_authenticated %}
                 <!-- Добавляем переключатель ленты -->

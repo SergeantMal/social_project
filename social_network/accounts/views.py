@@ -147,17 +147,18 @@ User = get_user_model()
 
 @login_required
 def user_list(request):
-    users = CustomUser.objects.exclude(id=request.user.id).annotate(
-        is_subscribed=Exists(
-            Subscription.objects.filter(
-                subscriber=request.user,
-                target_user=OuterRef('pk')
-            )
+    query = request.GET.get('q', '')
+    users = CustomUser.objects.all().order_by('username')
+
+    if query:
+        users = users.filter(
+            Q(username__icontains=query) |
+            Q(email__icontains=query)
         )
-    ).order_by('-date_joined')
 
     return render(request, 'accounts/user_list.html', {
         'users': users,
+        'search_query': query
     })
 
 

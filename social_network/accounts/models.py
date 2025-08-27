@@ -52,6 +52,12 @@ class CustomUser(AbstractUser):
             return self.profile_picture.url
         return '/static/images/default-profile.png'
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['username']),
+            models.Index(fields=['email']),
+        ]
+
 
 class Subscription(models.Model):
     subscriber = models.ForeignKey(
@@ -69,6 +75,10 @@ class Subscription(models.Model):
     class Meta:
         unique_together = ('subscriber', 'target_user')
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['subscriber']),
+            models.Index(fields=['target_user']),
+        ]
 
     def __str__(self):
         return f'{self.subscriber} -> {self.target_user}'
